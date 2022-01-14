@@ -45,7 +45,7 @@ You don't need Cube, drivers, headers, libc, IDEs, etc. Only vanilla freestandin
 
 On Linux use the Makefile. It is expected that arm-none-eabi- toolchain is 
 available via PATH. On Windows use .bat file. Cross-compiler for ARM may be
-downloaded here. To flash the image use ST utilities available
+downloaded 
 [here](https://developer.arm.com/tools-and-software/open-source-software/developer-tools/gnu-toolchain/gnu-rm/downloads).
 
 
