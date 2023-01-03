@@ -168,3 +168,18 @@ License
 
 ST's USB stack uses their own non-opensource license (see headers) and remains property 
 of ST. All other code except ST libraries is public domain.
+
+
+USB stack modifications
+-----------------------
+
+Original USB stack is modified significantly to make it more simple and flexible.
+Major changes are listed below:
+
+- Descriptors are now static and reside in ROM.
+- Device and class objects are allocated at user side, not in the deep of the library.
+- Static interface between the stack and the driver (usbd_drv.h header).
+- Error codes from errno.h, no ugly functions needed just for status translation from one layer to another.
+- Static strings in ROM.
+- Alignment from C11 standard (alignas/alignof).
+- Wrappers rewritten as static inline functions so they're removed at compile time.
