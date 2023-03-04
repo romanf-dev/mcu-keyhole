@@ -146,17 +146,20 @@ static size_t parse_number(const char* str, parser_state_t* parser_state, operat
 static int parse_cmdline(const char* str, operation_t* cmd)
 {
     parser_state_t parser_state = PS_KEY;
+    size_t offset = 0;
 
     do
     {
         while (isspace(*str)) 
             ++str;
 
-        str += (parser_state == PS_KEY) ? 
+        offset = (parser_state == PS_KEY) ? 
             parse_key(str, &parser_state, cmd) :
             parse_number(str, &parser_state, cmd);
+
+        str += offset;
     }
-    while (isspace(*str));
+    while (offset && isspace(*str));
 
     return (*str == '\0');
 }
