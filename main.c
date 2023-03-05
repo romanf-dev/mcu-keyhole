@@ -108,7 +108,7 @@ static inline size_t USBCDC_ReadString(
             {
                 i += avail;
                 
-                if (buf[i - 1] == '\r' || buf[i - 1] == '\n')
+                if (buf[i - 1] == '\n')
                 {
                     break;
                 }
@@ -329,15 +329,12 @@ int main(void)
 
         const size_t response = cmd_get_response(
             (char*)buffer, 
-            sizeof(buffer) - 2
+            sizeof(buffer)
         );
 
         if (response > 0)
         {
-            buffer[response] = '\r';
-            buffer[response + 1] = '\n';
-
-            USBCDC_WriteString(&hUsbDeviceFS, buffer, response + 2);
+            USBCDC_WriteString(&hUsbDeviceFS, buffer, response);
         }
     }
 
