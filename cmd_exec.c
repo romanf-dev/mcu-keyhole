@@ -44,7 +44,7 @@ enum
     DATA_BITS = sizeof(uint32_t) * CHAR_BIT,
     DATA_MASK = DATA_BITS - 1,
     CMD_SEPARATOR = '|',
-    CMD_STORAGE = 5,
+    CMD_STORAGE = 100,
 };
 
 static const char g_info[] = "STM32F103C8 FW ver: " __DATE__;

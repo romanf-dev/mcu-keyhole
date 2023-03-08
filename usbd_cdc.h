@@ -54,8 +54,8 @@ enum
     CDC_HS_BINTERVAL = 0x10U,
     CDC_FS_BINTERVAL = 0x10U,
 
-    HL_RX_BUFFER_SIZE = 256,
-    APP_RX_DATA_SIZE = 256,
+    HL_RX_BUFFER_SIZE = 128,
+    APP_RX_DATA_SIZE = 128,
 };
 
 typedef enum

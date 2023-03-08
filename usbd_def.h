@@ -215,7 +215,7 @@ typedef struct _USBD_HandleTypeDef
     USBD_EndpointTypeDef    ep_out[16];
     uint32_t                ep0_state;
     uint32_t                ep0_data_len;
-    uint8_t                 dev_state;
+    volatile uint8_t        dev_state;
     uint8_t                 dev_old_state;
     uint8_t                 dev_address;
     uint32_t                dev_remote_wakeup;
@@ -296,6 +296,8 @@ static inline USBD_StatusTypeDef USBD_DeInit(USBD_HandleTypeDef *pdev)
 static inline USBD_StatusTypeDef USBD_Start(USBD_HandleTypeDef *pdev)
 {
     USBD_Drv_Start(pdev->pData);
+    while (pdev->dev_state != USBD_STATE_CONFIGURED)
+        ;
     return USBD_OK;
 }
 

@@ -40,9 +40,7 @@ Building
 
 The project consists of minimum of code, only the things really needed. 
 You don't need Cube, drivers, headers, libc, IDEs, etc. Only vanilla freestanding C compiler.
-
-On Linux use the Makefile. It is expected that arm-none-eabi- toolchain is 
-available via PATH. On Windows use .bat file.
+It is expected that arm-none-eabi- toolchain is available via PATH.
 
 
 Port settings
@@ -54,21 +52,31 @@ Currently default settings from ST's USB stack are used: __9600/8-N-1__.
 Protocol description
 --------------------
 
-There are 6 command line keys: __a v t b w d__.
+There are 4 commands:
+
+- Read memory
+- Write memory
+- Wait for condition
+- Info
+
+Command line syntax:
+
+    <cmd>[optional access modifier] <arg1> <arg2> ... LF
 
 Note that device does not output echos so don't expect usual command line
 interface using either Putty or similar tools, it is intended to be used by 
 programs, not humans!
 However, if you prefer to use terminal program you may enable local echos.
 
-| Key | Description         |
+| Cmd | Description         |
 |-----|---------------------|
-| a   | MCU memory address  |
-| v   | Value for writes    |
-| t   | Device type & FW ver|
+| r   | Read MCU memory     |
+| w   | Write MCU memory    |
+| i   | Device type & FW ver|
+| u   | Wait condition      |
 
 Addresses and values are always lowercase hexadecimal strings.
-The latter three keys are required to override default memory access width.
+Each command except info may be also augmented by access width modifier:
 
 | Key | Description         |
 |-----|---------------------|
@@ -76,48 +84,43 @@ The latter three keys are required to override default memory access width.
 | w   | Word (16 bits)      |
 | d   | Doubleword (32 bits)|
 
-Width override keys are optional. By default memory access width is equal to
-width of "unsigned int" type for the target architecture.
+Width override keys are optional. By default memory access width is equal to width of "unsigned int".
 
 And yet another couple of facts about the protocol:
 
-- Request string must be terminated by CR, LF or CRLF.
+- Request string must be terminated by LF.
 - All device responses contain CRLF at end of the string.
-- Integers wider than specified width are truncated. 
-- Integers wider than 32-bit are considered as error. 
-- Writes don't output anything.
-- When incorrect string is received the device responds with word 'ERROR'.
+- Integers wider than specified width are truncated.
+- Integers wider than 32-bit are considered as error.
+- Writes output just CRLFs.
 
 Examples:
 
 Read value at address 0x11223344:
 
-    a 11223344
+    r 11223344
 
 Write value 0x55667788 to address 0x11223344:
 
-    a 11223344 v 55667788
+    w 11223344 55667788
 
 Write byte to the same address:
 
-    a 11223344 v 55 b
+    wb 11223344 55
 
 Single string may contain more than one request, for example:
 
-    'a 11223344\na 22334455'
+    'r 11223344 | r 22334455'
 
-Device will perform two accesses. 
-This approach may be helpful when there is need to perform two actions as
-fast as possible.
+Device will perform two accesses and its responses will be also separated by |.
+This approach may be helpful when there is need to perform two actions as fast as possible without 
+USB transmission overhead.
 
 
 Platform support
 ----------------
 
-Linux and Windows 10 require no additional drivers, just plug and play.
-Windows 7/8.1 contain usbser.sys driver but it does not install automatically.
-Try install .inf file in the project's folder, it will attach existing driver
-to device's VID/PID.
+Linux and Windows 10+ require no additional drivers, just plug and play. OSX should also work but untested.
 
 
 Troubleshooting
@@ -126,10 +129,11 @@ Troubleshooting
 On some Linux hosts after the device connected the host tries to talk to the 
 CDC interface so device send ERROR permanently. Attempts to 'cat' the device
 results in 'device busy' response.
-Try wait few minutes or try to use root console.
+Try wait few seconds or try to use root console.
+Also it is recommended to send empty string at the beginning to flush out AT commands from input buffer.
 
 Onboard LED is turned on in case of errors, also it blinks for 0.1s after
-USB subsystem is completely initialized. If it blinks single time on connect
+USB subsystem transition to CONFIGURED state. If it blinks single time on connect
 it means the device works properly. If it is in enabled state permanently
 the device is likely in HardFault state.
 
@@ -151,13 +155,13 @@ reconnected.
 Example program controlling PA_1 output on Bluepill using Bash:
 
     #!/bin/bash
-    echo 'a 40010800 v 44444464' > /dev/ttyACM0
+    echo 'w 40010800 44444464' > /dev/ttyACM0
     counter=1
     until [ $counter -gt 10 ]
     do
-        echo 'a 40010810 v 2' > /dev/ttyACM0
+        echo 'w 40010810 2' > /dev/ttyACM0
         sleep 1
-        echo 'a 40010810 v 20000' > /dev/ttyACM0
+        echo 'w 40010810 20000' > /dev/ttyACM0
         sleep 1
         ((counter++))
     done

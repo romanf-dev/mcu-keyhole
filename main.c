@@ -281,7 +281,6 @@ int main(void)
     GPIOA->BSRR = GPIO_BSRR_BR12; 
     Delay(100);
 
-
     hpcd_USB_FS.Instance = USB;
     hpcd_USB_FS.Init.dev_endpoints = 8;
     hpcd_USB_FS.Init.speed = PCD_SPEED_FULL;
@@ -306,6 +305,8 @@ int main(void)
     NVIC_SetPriority(USB_LP_CAN1_RX0_IRQn, 0);
     NVIC_EnableIRQ(USB_LP_CAN1_RX0_IRQn);    
   
+    __enable_irq();
+
     if (USBD_Start(&hUsbDeviceFS) != USBD_OK)
     {
         Error_Handler();
@@ -323,7 +324,7 @@ int main(void)
     //
     for (;;)
     {
-        static uint8_t buffer[100];
+        static uint8_t buffer[1024];
 
         USBCDC_ReadString(&hUsbDeviceFS, buffer, sizeof(buffer));
 
