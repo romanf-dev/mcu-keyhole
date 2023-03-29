@@ -117,6 +117,38 @@ This approach may be helpful when there is need to perform two actions as fast a
 USB transmission overhead.
 
 
+Waiting
+-------
+
+Most MCU interfaces depend on timing and have 'ready' bits which must be polled 
+before either sending or receiving data via that interface.
+These bits may be polled by reads, but every read may take too much time since 
+it should be sent to host and interpreted there. Separate wait command has been 
+added to address this issue.
+Instead of polling on PC side, wait command may be part of a batch like this:
+
+    'u <wait arg> | w <write arg>'
+
+This will write immediately after wait condition is satisfied.
+Wait takes two arguments: address and wait descriptor described below. 
+Also it may have access width modifier just like reads and writes.
+Wait descriptor has the following format:
+
+| Bits | Length | Description                                        |
+|------|-------------------------------------------------------------|
+| 4:0  | 5      | Bit number (0-31)                                  |
+| 5    | 1      | Expected value to wait 1 or 0                      |
+| 6    | 1      | If 1 - stop the batch if condition is not satisfied|
+| 7    | 1      | Reserved                                           |
+| 31:8 | 24     | Max iterations or default if 0                     |
+
+For example, wait for 5th bit at address 11223344 to be 1:
+
+    'u 11223344 25'
+
+25 = 0b100101: bits [4:0] = 5, bit 5 = 1.
+
+
 Platform support
 ----------------
 
