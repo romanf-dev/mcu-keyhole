@@ -135,7 +135,7 @@ Also it may have access width modifier just like reads and writes.
 Wait descriptor has the following format:
 
 | Bits | Length | Description                                        |
-|------|-------------------------------------------------------------|
+|------|--------|----------------------------------------------------|
 | 4:0  | 5      | Bit number (0-31)                                  |
 | 5    | 1      | Expected value to wait 1 or 0                      |
 | 6    | 1      | If 1 - stop the batch if condition is not satisfied|
