@@ -15,9 +15,8 @@ GCC_PREFIX ?= arm-none-eabi-
 	$(GCC_PREFIX)gcc -mcpu=cortex-m3 -mthumb -c -o $@ $<
 
 all : $(OBJS) startup_stm32f103c8tx.o
-	$(GCC_PREFIX)ld -nostartfiles -nostdlib --gc-sections -T LinkerScript.ld -o keyhole.elf $(OBJS) startup_stm32f103c8tx.o
-	$(GCC_PREFIX)objcopy -O binary keyhole.elf keyhole.bin
+	$(GCC_PREFIX)ld -nostdlib --gc-sections -T LinkerScript.ld -o keyhole.elf $(OBJS) startup_stm32f103c8tx.o
 
 clean:
-	rm -f *.o *.elf *.bin
+	rm -f *.o *.elf
 
