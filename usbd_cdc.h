@@ -53,24 +53,11 @@ enum
     CDC_SEND_BREAK = 0x23U,
     CDC_HS_BINTERVAL = 0x10U,
     CDC_FS_BINTERVAL = 0x10U,
-
-    HL_RX_BUFFER_SIZE = 128,
-    APP_RX_DATA_SIZE = 128,
 };
 
-typedef enum
-{
-    USB_CDC_RX_BUFFER_OK   = 0U,
-    USB_CDC_RX_BUFFER_NO_DATA
-} 
-USB_CDC_RX_BUFFER_StatusTypeDef;
-
-uint8_t CDC_Transmit(USBD_HandleTypeDef* pdev, const uint8_t* Buf, uint16_t sz);
-uint8_t CDC_ReadRxBuffer(USBD_HandleTypeDef* pdev, uint8_t* Buf, uint16_t sz);
-uint16_t CDC_GetRxBufferBytesAvailable(USBD_HandleTypeDef* pdev);
-void CDC_FlushRxBuffer(USBD_HandleTypeDef* pdev);
-
-extern const USBD_ClassTypeDef USBD_CDC;
+const USBD_ClassTypeDef* CDC_Init(void);
+void CDC_Transmit(USBD_HandleTypeDef *pdev, const void* buffer, size_t size);
+void CDC_Receive(USBD_HandleTypeDef *pdev, void* buffer, size_t size);
 
 #ifdef __cplusplus
 }

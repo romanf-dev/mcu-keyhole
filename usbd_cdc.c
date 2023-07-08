@@ -58,6 +58,7 @@
 #include <stdalign.h>
 #include "usbd_def.h"
 #include "usbd_cdc.h"
+#include <assert.h>
 
 alignas(sizeof(uint32_t)) static const uint8_t USBD_CDC_DeviceQualifierDesc[] =
 {
@@ -73,7 +74,7 @@ alignas(sizeof(uint32_t)) static const uint8_t USBD_CDC_DeviceQualifierDesc[] =
     0x00,
 };
 
-alignas(sizeof(uint32_t)) uint8_t const 
+alignas(sizeof(uint32_t)) static uint8_t const 
 USBD_CDC_CfgHSDesc[USB_CDC_CONFIG_DESC_SIZ] =
 {
     /*Configuration Descriptor*/
@@ -168,7 +169,7 @@ USBD_CDC_CfgHSDesc[USB_CDC_CONFIG_DESC_SIZ] =
     0x00                                /* bInterval ignore for Bulk transfer */
 };
 
-alignas(sizeof(uint32_t)) const uint8_t 
+alignas(sizeof(uint32_t)) static const uint8_t 
 USBD_CDC_CfgFSDesc[USB_CDC_CONFIG_DESC_SIZ] =
 {
     /*Configuration Descriptor*/
@@ -265,7 +266,7 @@ USBD_CDC_CfgFSDesc[USB_CDC_CONFIG_DESC_SIZ] =
     0x00                                /* bInterval ignore for Bulk transfer */
 };
 
-alignas(sizeof(uint32_t)) uint8_t const 
+alignas(sizeof(uint32_t)) static uint8_t const 
 USBD_CDC_OtherSpeedCfgDesc[USB_CDC_CONFIG_DESC_SIZ] =
 {
     0x09,   /* bLength: Configuation Descriptor size */
@@ -363,16 +364,9 @@ typedef struct
     uint32_t data[CDC_DATA_HS_MAX_PACKET_SIZE / 4U];  /* Force 32bits align */
     uint8_t CmdOpCode;
     uint8_t CmdLength;
-    uint32_t TxState;
     uint8_t lcBuffer[7]; // Line coding buffer
-    uint8_t UserRxBuffer[APP_RX_DATA_SIZE];
-    volatile uint8_t rxBuffer[HL_RX_BUFFER_SIZE]; // Receive buffer
-    volatile uint16_t rxBufferHeadPos; // Receive buffer write position
-    volatile uint16_t rxBufferTailPos; // Receive buffer read position
 }
 USBD_CDC_HandleTypeDef;
-
-static USBD_CDC_HandleTypeDef USBD_CDC_Data;
 
 /******************************************************************************/
 /* Line Coding Structure                                                      */
@@ -434,9 +428,6 @@ static void CDC_Control(
             pbuf[4] = hcdc->lcBuffer[4];
             pbuf[5] = hcdc->lcBuffer[5];
             pbuf[6] = hcdc->lcBuffer[6];
-
-            CDC_FlushRxBuffer(pdev);
-
         break;
 
         default: break;
@@ -452,8 +443,9 @@ static void CDC_Control(
   */
 static uint8_t USBD_CDC_Init(USBD_HandleTypeDef *pdev, uint8_t cfgidx)
 {
+    static USBD_CDC_HandleTypeDef classPrivateData;
+
     uint8_t ret = 0U;
-    USBD_CDC_HandleTypeDef *hcdc;
     size_t in_packet_size = 0;
     size_t out_packet_size = 0;
 
@@ -472,23 +464,22 @@ static uint8_t USBD_CDC_Init(USBD_HandleTypeDef *pdev, uint8_t cfgidx)
     USBD_EP_Open(pdev, CDC_OUT_EP, out_packet_size, USBD_EP_TYPE_BULK);
     USBD_EP_Open(pdev, CDC_CMD_EP, CDC_CMD_PACKET_SIZE, USBD_EP_TYPE_INTR);
 
-    pdev->pClassData = &USBD_CDC_Data;
-    hcdc = (USBD_CDC_HandleTypeDef *) pdev->pClassData;
-
     // https://stackoverflow.com/a/26925578
     const uint32_t baudrate = 9600;
-    hcdc->lcBuffer[0] = (uint8_t)(baudrate);
-    hcdc->lcBuffer[1] = (uint8_t)(baudrate >> 8);
-    hcdc->lcBuffer[2] = (uint8_t)(baudrate >> 16);
-    hcdc->lcBuffer[3] = (uint8_t)(baudrate >> 24);
-    hcdc->lcBuffer[4] = 0; // 1 Stop bit
-    hcdc->lcBuffer[5] = 0; // No parity
-    hcdc->lcBuffer[6] = 8; // 8 data bits
+    classPrivateData.lcBuffer[0] = (uint8_t)(baudrate);
+    classPrivateData.lcBuffer[1] = (uint8_t)(baudrate >> 8);
+    classPrivateData.lcBuffer[2] = (uint8_t)(baudrate >> 16);
+    classPrivateData.lcBuffer[3] = (uint8_t)(baudrate >> 24);
+    classPrivateData.lcBuffer[4] = 0; // 1 Stop bit
+    classPrivateData.lcBuffer[5] = 0; // No parity
+    classPrivateData.lcBuffer[6] = 8; // 8 data bits
+    classPrivateData.CmdOpCode = 0;
+    classPrivateData.CmdLength = 0;
 
-    hcdc->TxState = 0U;
+    pdev->pClassData = &classPrivateData;
 
     /* Prepare Out endpoint to receive next packet */
-    USBD_EP_Receive(pdev, CDC_OUT_EP, hcdc->UserRxBuffer, out_packet_size);
+    pdev->pClass->DataOut(pdev, CDC_OUT_EP);
     return ret;
 }
 
@@ -585,71 +576,6 @@ USBD_CDC_Setup(USBD_HandleTypeDef *pdev, const USBD_SetupReqTypedef *req)
 }
 
 /**
-  * @brief  USBD_CDC_DataIn
-  *         Data sent on non-control IN endpoint
-  * @param  pdev: device instance
-  * @param  epnum: endpoint number
-  * @retval status
-  */
-static uint8_t USBD_CDC_DataIn(USBD_HandleTypeDef *pdev, uint8_t epnum)
-{
-    USBD_CDC_HandleTypeDef *hcdc = (USBD_CDC_HandleTypeDef *)pdev->pClassData;
-
-    /*&& (pdev->ep_in[epnum].total_length % hpcd->IN_ep[epnum].maxpacket) == 0*/
-
-    if ((pdev->ep_in[epnum].total_length > 0))
-    {
-        pdev->ep_in[epnum].total_length = 0;
-
-        /* Send ZLP */
-        USBD_EP_Transmit(pdev, epnum, NULL, 0);
-    }
-    else
-    {
-        hcdc->TxState = 0U;
-    }
-
-    return USBD_OK;
-}
-
-/**
-  * @brief  USBD_CDC_DataOut
-  *         Data received on non-control Out endpoint
-  * @param  pdev: device instance
-  * @param  epnum: endpoint number
-  * @retval status
-  */
-static uint8_t USBD_CDC_DataOut(USBD_HandleTypeDef *pdev, uint8_t epnum)
-{
-    USBD_CDC_HandleTypeDef *hcdc = (USBD_CDC_HandleTypeDef *) pdev->pClassData;
-    const uint16_t len = USBD_GetRxCount(pdev, epnum);
-    uint16_t tempHeadPos = hcdc->rxBufferHeadPos;
-    const uint32_t max_packet_size = (pdev->dev_speed == USBD_SPEED_HIGH) ?
-        CDC_DATA_HS_OUT_PACKET_SIZE :
-        CDC_DATA_FS_OUT_PACKET_SIZE;
-
-    /* USB data will be immediately processed, this allow next USB traffic being
-    NAKed till the end of the application Xfer */
-
-    for (uint32_t i = 0; i < len; i++) 
-    {
-        hcdc->rxBuffer[tempHeadPos] = hcdc->UserRxBuffer[i];
-        tempHeadPos = (uint16_t)(
-            (uint16_t)(tempHeadPos + 1) % HL_RX_BUFFER_SIZE
-        );
-
-        if (tempHeadPos == hcdc->rxBufferTailPos) 
-        {
-            return USBD_FAIL;
-        }
-    }
-
-    hcdc->rxBufferHeadPos = tempHeadPos;
-    USBD_EP_Receive(pdev, CDC_OUT_EP, hcdc->UserRxBuffer, max_packet_size);
-    return USBD_OK;
-}
-
-/**
   * @brief  USBD_CDC_EP0_RxReady
   *         Handle EP0 Rx Ready event
   * @param  pdev: device instance
@@ -669,79 +595,52 @@ static uint8_t USBD_CDC_EP0_RxReady(USBD_HandleTypeDef *pdev)
 }
 
 /**
-  * @brief  CDC_Transmit
-  *         Data to send over USB IN endpoint are sent over CDC interface
-  *         through this function.
-  * @param  Buf: Buffer of data to be sent
-  * @param  Len: Number of data to be sent (in bytes)
-  * @retval USBD_OK if all operations are OK else USBD_FAIL or USBD_BUSY
+  * @brief  CDC Init
+  * @retval Pointer to class callbacks.
   */
-uint8_t CDC_Transmit(USBD_HandleTypeDef* pdev, const uint8_t* Buf, uint16_t Len)
+const USBD_ClassTypeDef* CDC_Init(void)
 {
-    USBD_CDC_HandleTypeDef *hcdc = pdev->pClassData;
-    uint8_t status = USBD_BUSY;
-
-    if (hcdc->TxState == 0)
+    static const USBD_ClassTypeDef cdcClass =
     {
-        hcdc->TxState = 1U;
-        pdev->ep_in[CDC_IN_EP & 0xFU].total_length = Len;
-        USBD_EP_Transmit(pdev, CDC_IN_EP, Buf, Len);
-        status = USBD_OK;        
-    }
-
-    return status;
+        USBD_CDC_Init,
+        USBD_CDC_DeInit,
+        USBD_CDC_Setup,
+        NULL,
+        USBD_CDC_EP0_RxReady,
+        NULL,
+        NULL,
+        NULL,
+        NULL,
+        NULL,
+        { USBD_CDC_CfgHSDesc, sizeof(USBD_CDC_CfgHSDesc) },
+        { USBD_CDC_CfgFSDesc, sizeof(USBD_CDC_CfgFSDesc) },
+        { USBD_CDC_OtherSpeedCfgDesc, sizeof(USBD_CDC_OtherSpeedCfgDesc) },
+        { USBD_CDC_DeviceQualifierDesc, sizeof(USBD_CDC_DeviceQualifierDesc) },
+    };
+    
+    return &cdcClass;
 }
 
-uint8_t CDC_ReadRxBuffer(USBD_HandleTypeDef* pdev, uint8_t* Buf, uint16_t Len) 
+/**
+  * @brief  Transmits data buffer to CDC endpoint.
+  */
+void CDC_Transmit(USBD_HandleTypeDef *pdev, const void* buffer, size_t size)
 {
-	uint16_t bytesAvailable = CDC_GetRxBufferBytesAvailable(pdev);
-    USBD_CDC_HandleTypeDef *hcdc = pdev->pClassData;
-    uint8_t status = USB_CDC_RX_BUFFER_NO_DATA;
-
-	if (bytesAvailable >= Len)
-    {
-        for (uint8_t i = 0; i < Len; i++) 
-        {
-            Buf[i] = hcdc->rxBuffer[hcdc->rxBufferTailPos];
-            hcdc->rxBufferTailPos = (uint16_t)(
-                (uint16_t)(hcdc->rxBufferTailPos + 1) % HL_RX_BUFFER_SIZE
-            );
-        }
-
-        status = USB_CDC_RX_BUFFER_OK;
-    }
-
-	return status;
+    pdev->ep_in[CDC_IN_EP & 0xFU].total_length = size;
+    USBD_EP_Transmit(pdev, CDC_IN_EP, buffer, size);
 }
 
-uint16_t CDC_GetRxBufferBytesAvailable(USBD_HandleTypeDef* pdev) 
+/**
+  * @brief  Sets incoming data buffers for CDC endpoint.
+  */
+void CDC_Receive(USBD_HandleTypeDef *pdev, void* buffer, size_t size)
 {
-    USBD_CDC_HandleTypeDef *hcdc = pdev->pClassData;
-    return (uint16_t)
-        (hcdc->rxBufferHeadPos - hcdc->rxBufferTailPos) % HL_RX_BUFFER_SIZE;
+    const uint32_t packet_size = (pdev->dev_speed == USBD_SPEED_HIGH) ?
+        CDC_DATA_HS_OUT_PACKET_SIZE :
+        CDC_DATA_FS_OUT_PACKET_SIZE;
+
+    assert(size >= packet_size);
+
+    USBD_EP_Receive(pdev, CDC_OUT_EP, buffer, size);
 }
 
-void CDC_FlushRxBuffer(USBD_HandleTypeDef* pdev) 
-{
-    USBD_CDC_HandleTypeDef *hcdc = pdev->pClassData;
-    hcdc->rxBufferHeadPos = 0;
-    hcdc->rxBufferTailPos = 0;
-}
-
-const USBD_ClassTypeDef USBD_CDC =
-{
-    USBD_CDC_Init,
-    USBD_CDC_DeInit,
-    USBD_CDC_Setup,
-    NULL,
-    USBD_CDC_EP0_RxReady,
-    USBD_CDC_DataIn,
-    USBD_CDC_DataOut,
-    NULL,
-    NULL,
-    NULL,
-    { USBD_CDC_CfgHSDesc, sizeof(USBD_CDC_CfgHSDesc) },
-    { USBD_CDC_CfgFSDesc, sizeof(USBD_CDC_CfgFSDesc) },
-    { USBD_CDC_OtherSpeedCfgDesc, sizeof(USBD_CDC_OtherSpeedCfgDesc) },
-    { USBD_CDC_DeviceQualifierDesc, sizeof(USBD_CDC_DeviceQualifierDesc) },
-};
