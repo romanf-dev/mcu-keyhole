@@ -39,8 +39,9 @@ Building
 --------
 
 The project consists of minimum of code, only the things really needed. 
-You don't need Cube, drivers, headers, libc, IDEs, etc. Only vanilla freestanding C compiler.
-It is expected that arm-none-eabi- toolchain is available via PATH.
+You don't need Cube, drivers, headers, libc, IDEs, etc. Only vanilla 
+freestanding C compiler. It is expected that arm-none-eabi- toolchain is 
+available via PATH.
 
 
 Port settings
@@ -84,7 +85,8 @@ Each command except info may be also augmented by access width modifier:
 | w   | Word (16 bits)      |
 | d   | Doubleword (32 bits)|
 
-Width override keys are optional. By default memory access width is equal to width of "unsigned int".
+Width override keys are optional. By default memory access width is equal to 
+width of "unsigned int".
 
 And yet another couple of facts about the protocol:
 
@@ -113,8 +115,8 @@ Single string may contain more than one request, for example:
     'r 11223344 | r 22334455'
 
 Device will perform two accesses and its responses will be also separated by |.
-This approach may be helpful when there is need to perform two actions as fast as possible without 
-USB transmission overhead.
+This approach may be helpful when there is need to perform two actions as fast 
+as possible without USB transmission overhead.
 
 
 Waiting
@@ -152,17 +154,22 @@ For example, wait for 5th bit at address 11223344 to be 1:
 Platform support
 ----------------
 
-Linux and Windows 10+ require no additional drivers, just plug and play. OSX should also work but untested.
+Linux and Windows 10+ require no additional drivers, just plug and play. OSX 
+should also work but untested.
 
 
 Troubleshooting
 ---------------
 
-On some Linux hosts after the device connected the host tries to talk to the 
-CDC interface so device send ERROR permanently. Attempts to 'cat' the device
-results in 'device busy' response.
-Try wait few seconds or try to use root console.
-Also it is recommended to send empty string at the beginning to flush out AT commands from input buffer.
+Since CDC class device is recongnized as a modem by default, on some Linux hosts
+ after the device is connected the host tries to talk to the CDC interface so 
+device send ERROR permanently. To fix these issues the device should be
+switched to raw mode after connection:
+
+        sudo stty raw -echo -F <path to the device, usually /dev/ttyACM0>
+
+Also it is recommended to send empty string at the beginning to flush out AT 
+commands from input buffer if any.
 
 Onboard LED is turned on in case of errors, also it blinks for 0.1s after
 USB subsystem transition to CONFIGURED state. If it blinks single time on connect
