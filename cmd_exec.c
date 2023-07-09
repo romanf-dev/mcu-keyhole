@@ -309,7 +309,7 @@ static inline uint32_t do_wait(const uintptr_t addr, const uint32_t n, const siz
     return (wait_id.field.result_type == 0) ? last_val : i;
 }
 
-static inline size_t run_cmd(const struct operation_t* cmd, char buf[const static 1], bool* stop)
+static inline size_t run_cmd(const struct operation_t* cmd, char buf[const static sizeof(g_info)], bool* stop)
 {
     size_t offset = 0;
 
